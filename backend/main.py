@@ -1,54 +1,74 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 
 app = FastAPI()
 
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Adjust this to your frontend's URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# Data models for nodes and edges
 class Node(BaseModel):
     id: str
     type: str
-    data: dict
+    position: Dict[str, float]
+    data: Dict[str, str]
 
 class Edge(BaseModel):
+    id: str
     source: str
     target: str
 
 class Pipeline(BaseModel):
     nodes: List[Node]
     edges: List[Edge]
+    
+    
+# Endpoint to parse the pipeline data
+@app.post("/pipelines/parse")
+def parse_pipeline(pipeline: Pipeline):
+    nodes = pipeline.nodes
+    edges = pipeline.edges
 
-def is_dag(nodes, edges):
-    from collections import defaultdict, deque
+    num_nodes = len(nodes)
+    num_edges = len(edges)
 
-    graph = defaultdict(list)
-    in_degree = {node.id: 0 for node in nodes}
 
+    # Build the graph representation
+    graph = {node.id: [] for node in nodes}
     for edge in edges:
         graph[edge.source].append(edge.target)
-        in_degree[edge.target] += 1
+        
+    # Function to check if the graph is a Directed Acyclic Graph (DAG)
+    def is_dag(graph):
+        visited = set()
+        rec_stack = set()
 
-    queue = deque([node for node in nodes if in_degree[node.id] == 0])
-    visited = 0
+        def dfs(node):
+            if node in rec_stack:
+                return False
+            if node in visited:
+                return True
 
-    while queue:
-        node = queue.popleft()
-        visited += 1
+            visited.add(node)
+            rec_stack.add(node)
+            for neighbor in graph[node]:
+                if not dfs(neighbor):
+                    return False
+            rec_stack.remove(node)
+            return True
 
-        for neighbor in graph[node]:
-            in_degree[neighbor] -= 1
-            if in_degree[neighbor] == 0:
-                queue.append(neighbor)
+        for node in graph:
+            if not dfs(node):
+                return False
+        return True
 
-    return visited == len(nodes)
+    is_dag_result = is_dag(graph)
 
-@app.post("/pipelines/parse")
-async def parse_pipeline(pipeline: Pipeline):
-    num_nodes = len(pipeline.nodes)
-    num_edges = len(pipeline.edges)
-    is_dag_result = is_dag(pipeline.nodes, pipeline.edges)
-
-    return {
-        "num_nodes": num_nodes,
-        "num_edges": num_edges,
-        "is_dag": is_dag_result
-    }
+    return {"num_nodes": num_nodes, "num_edges": num_edges, "is_dag": is_dag_result}
