@@ -1,5 +1,6 @@
 
 ![alt text](<workingappss.png>)
+![alt text](<withbackend_response.png>)
 
 # Part 1: Node Abstraction
 
@@ -12,6 +13,7 @@ State Management, Event Handlers, Rendering Logic, etc are all handled by the No
 # Part 2: Styling
 
 see ` frontend/src/index.css ` for styling.
+
 
 use: tailwind
 
